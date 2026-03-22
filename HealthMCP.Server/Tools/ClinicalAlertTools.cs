@@ -10,6 +10,7 @@ namespace HealthMCP.Server.Tools;
 public sealed class ClinicalAlertTools
 {
     private static readonly Dictionary<(string A, string B), string> DrugInteractions = BuildDrugInteractions();
+    private static readonly Dictionary<string, MedicationGuideline> MedicationGuidelines = BuildMedicationGuidelines();
 
     [McpServerTool(Name = "check_drug_interactions")]
     [Description("Checks a static reference list for clinically significant drug–drug interactions.")]
@@ -31,6 +32,22 @@ public sealed class ClinicalAlertTools
         sb.AppendLine($"Medications: {drug1.Trim()} + {drug2.Trim()}");
         sb.AppendLine($"Interaction: {description}");
         sb.AppendLine("Severity: HIGH - Consult prescribing physician before administering.");
+        return sb.ToString().TrimEnd();
+    }
+
+    [McpServerTool(Name = "get_medication_guidelines")]
+    [Description("Returns evidence-based dosing and monitoring guidelines for a medication, including standard dose range, monitoring parameters, and key contraindications.")]
+    public static string GetMedicationGuidelines([Description("Medication name, e.g. Metformin")] string medicationName)
+    {
+        var key = medicationName.Trim().ToLowerInvariant();
+        if (key.Length == 0 || !MedicationGuidelines.TryGetValue(key, out var g))
+            return $"No guidelines found for {medicationName}. Consult a clinical pharmacist or current formulary.";
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"Medication: {medicationName.Trim()}");
+        sb.AppendLine($"Standard dose range: {g.DoseRange}");
+        sb.AppendLine($"Key monitoring: {g.Monitoring}");
+        sb.AppendLine($"Primary contraindications / precautions: {g.Contraindications}");
         return sb.ToString().TrimEnd();
     }
 
@@ -254,5 +271,54 @@ public sealed class ClinicalAlertTools
         Add("prednisone", "ibuprofen", "Glucocorticoid plus NSAID markedly increases risk of gastric ulceration and GI bleeding.");
 
         return d;
+    }
+
+    private sealed record MedicationGuideline(string DoseRange, string Monitoring, string Contraindications);
+
+    private static Dictionary<string, MedicationGuideline> BuildMedicationGuidelines()
+    {
+        return new Dictionary<string, MedicationGuideline>(StringComparer.Ordinal)
+        {
+            ["metformin"] = new(
+                "500–2000 mg daily in 1–3 divided doses (immediate-release); titrate by tolerance and glycemic response.",
+                "Renal function (eGFR/creatinine), vitamin B12 if long-term use or anemia, and clinical signs of lactic acidosis if unwell.",
+                "eGFR persistently below prescribing thresholds per formulary, acute or unstable heart failure, severe hypoxemia/sepsis, acute contrast studies without pause per protocol."),
+            ["lisinopril"] = new(
+                "2.5–40 mg once daily for hypertension or heart failure; heart-failure doses often at the lower end initially.",
+                "Blood pressure, serum potassium and creatinine after initiation or dose changes, and angioedema history.",
+                "History of ACE-inhibitor angioedema, bilateral renal artery stenosis, pregnancy, and concurrent high-K+ states without monitoring."),
+            ["warfarin"] = new(
+                "Highly individualized; many adult indications target INR 2.0–3.0 (some mechanical valves 2.5–3.5).",
+                "INR per schedule, bleeding signs, medication and diet changes; acute illness may require closer checks.",
+                "Active major bleeding, pregnancy (except rare supervised cases), inability to adhere to monitoring, significant non-compliance without safeguards."),
+            ["simvastatin"] = new(
+                "10–40 mg once daily in the evening; 80 mg only in exceptional stable patients per specialist guidance.",
+                "Liver enzymes (baseline and if symptoms), CK/muscle symptoms; drug interaction review (CYP3A4).",
+                "Active liver disease, unexplained persistent transaminase elevations, pregnancy/lactation, concomitant strong CYP3A4 inhibitors with simvastatin per labeling."),
+            ["fluoxetine"] = new(
+                "20–60 mg daily for major depression (adult); lower start in some populations per label.",
+                "Suicidal ideation (especially early), activation/mania in bipolar disorder, hyponatremia risk, bleeding with antiplatelets/anticoagulants, QT if risk factors.",
+                "Concomitant or recent MAOI use (washout intervals per label), thioridazine with fluoxetine, untreated acute mania."),
+            ["amiodarone"] = new(
+                "Loading then maintenance per arrhythmia protocol; oral maintenance often 100–400 mg daily depending on indication and tolerance.",
+                "Thyroid function, LFTs, pulmonary symptoms/chest imaging if cough or dyspnea, ECG/QT, ophthalmologic exams long-term.",
+                "Severe sinus-node dysfunction without pacemaker, marked bradycardia, iodine hypersensitivity (context-dependent), pregnancy except life-threatening arrhythmia."),
+            ["digoxin"] = new(
+                "Typical maintenance 0.125–0.25 mg daily in adults; heart failure often lower dose with reduced renal function.",
+                "Serum digoxin levels when narrow therapeutic index suspected, renal function, potassium and magnesium, ECG/bradycardia symptoms.",
+                "Ventricular fibrillation, known digoxin toxicity, accessory-pathway tachycardias without specialist oversight, significant interaction accumulation."),
+            ["methotrexate"] = new(
+                "Weekly (not daily) dosing for autoimmune indications; oncology regimens are protocol-specific.",
+                "CBC with differential, LFTs, creatinine at baseline and on schedule; folic/folinic acid per protocol.",
+                "Pregnancy and breastfeeding, immunodeficiency, active serious infection, significant renal/hepatic impairment without dose adjustment plan."),
+            ["lithium"] = new(
+                "300–1200 mg/day in divided doses for bipolar maintenance; titrate to serum level and tolerability.",
+                "Serum lithium levels (trough), sodium/hydration status, renal function, thyroid function.",
+                "Severe renal impairment, severe dehydration or sodium-wasting states, inability to obtain reliable level monitoring."),
+            ["ciprofloxacin"] = new(
+                "250–750 mg twice daily for many infections (dose/duration by site and severity per guideline).",
+                "Tendon pain or rupture risk (especially with steroids), QT prolongation risk, glucose disturbances, CNS effects in at-risk patients.",
+                "Concomitant tizanidine, myasthenia gravis (may worsen weakness); adjust renal dosing per eGFR.")
+        };
     }
 }
