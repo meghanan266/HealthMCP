@@ -29,14 +29,13 @@ public static class DotEnvLoader
 
     private static string? FindEnvFilePath()
     {
-        for (var dir = new DirectoryInfo(Directory.GetCurrentDirectory()); dir != null; dir = dir.Parent)
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
         {
             var candidate = Path.Combine(dir.FullName, ".env");
             if (File.Exists(candidate))
                 return candidate;
         }
 
-        var baseCandidate = Path.Combine(AppContext.BaseDirectory, ".env");
-        return File.Exists(baseCandidate) ? baseCandidate : null;
+        return null;
     }
 }
